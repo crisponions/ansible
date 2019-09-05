@@ -1,8 +1,0 @@
-{{ inventory_hostname.upper() }}
-{{ '-' *  inventory_hostname|length }}
-NAME,INPUT,OUPUT
-{% for intf in interface_facts %}
-{% for item in intf.values() %}
-{{ item.name }},{{item.input}},{{item.output}}
-{% endfor %}
-{% endfor %}
