@@ -1,0 +1,49 @@
+---
+- name: MAIN PLAY
+  hosts: localhost
+  connection: local
+
+  tasks:
+    - set_fact:
+        cf_ranges_w1: "{{ lookup('aws_service_ip_ranges', service='CLOUDFRONT', region='us-west-1', wantlist='True') }}"
+        cf_ranges_w2: "{{ lookup('aws_service_ip_ranges', service='CLOUDFRONT', region='us-west-2', wantlist='True') }}"
+        cf_ranges_e1: "{{ lookup('aws_service_ip_ranges', service='CLOUDFRONT', region='us-east-1', wantlist='True') }}"
+        cf_ranges_e2: "{{ lookup('aws_service_ip_ranges', service='CLOUDFRONT', region='us-east-2', wantlist='True') }}"
+
+        ec2_ranges_w1: "{{ lookup('aws_service_ip_ranges', service='EC2', region='us-west-1', wantlist='True') }}"
+        ec2_ranges_w2: "{{ lookup('aws_service_ip_ranges', service='EC2', region='us-west-2', wantlist='True') }}"
+        ec2_ranges_e1: "{{ lookup('aws_service_ip_ranges', service='EC2', region='us-east-1', wantlist='True') }}"
+        ec2_ranges_e2: "{{ lookup('aws_service_ip_ranges', service='EC2', region='us-east-2', wantlist='True') }}"
+
+    - name: MERGE LISTS
+      set_fact:
+        all_ips: "{{ cf_ranges_w1 + cf_ranges_w2 + cf_ranges_e1 + cf_ranges_e2 + ec2_ranges_w1 + ec2_ranges_w2 + ec2_ranges_e1 + ec2_ranges_e2 }}"
+
+- name: Create ACL on ASA
+  hosts: dc-asa,pdx-asa,lax-asa,sea-asa
+  connection: network_cli
+  gather_facts: no
+  become: yes
+  become_method: enable
+
+  tasks:
+    - name: DELETE CURRENT ACL
+      asa_config:
+        lines:
+          - clear configure access-list AMAZON
+      ignore_errors: yes
+ 
+    - name: CREATE ACL
+      asa_acl:
+        lines:
+          - "access-list AMAZON extended permit ip any {{ item | ipaddr('network') }} {{ item | ipaddr('netmask') }}"
+      with_items:
+        - "{{ hostvars['localhost']['ec2_ranges_w1'] }}"
+        - "{{ hostvars['localhost']['ec2_ranges_w2'] }}"
+        - "{{ hostvars['localhost']['ec2_ranges_e1'] }}"
+        - "{{ hostvars['localhost']['ec2_ranges_e2'] }}"
+        - "{{ hostvars['localhost']['cf_ranges_e1'] }}"
+        - "{{ hostvars['localhost']['cf_ranges_e2'] }}"
+        - "{{ hostvars['localhost']['cf_ranges_w1'] }}"
+        - "{{ hostvars['localhost']['cf_ranges_w2'] }}"
+

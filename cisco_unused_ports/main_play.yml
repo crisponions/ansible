@@ -1,6 +1,6 @@
 ---
 - name: FIND FREE PORTS
-  hosts: daves-switch
+  hosts: sea
   gather_facts: no
   connection: network_cli
 
@@ -23,7 +23,19 @@
     #  debug:
     #    var: interface_facts
     
-    - name: GENERATE REPORT
+    - name: GENERATE REPORTS
       template:
         src: "templates/free_ports_template.j2"
-        dest: "{{inventory_hostname}}_free_port.csv"
+        dest: "reports/{{inventory_hostname}}_free_port.csv"
+    
+    - name: CONSOLIDATE FILES INTO ONE REPORT
+      assemble:
+        src: "reports/"
+        dest: "reports/free_ports.csv"
+      delegate_to: localhost
+      run_once: yes
+
+    - name: CLEAN UP FILES
+      file:
+        path: "reports/{{inventory_hostname}}_free_port.csv"
+        state: absent
